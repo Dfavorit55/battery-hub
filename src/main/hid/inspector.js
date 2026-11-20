@@ -70,8 +70,11 @@ async function capture(logicalDevice, { pingOutputs = true, onProgress = null } 
 
     // Sweep once, then only re-poll the reports this collection actually has.
     const supported = [];
+    // Some devices take a second or more to refuse each one, so the sweep stops at the scan's end:
+    // past it, the main process has given up on the scan (hid-client.js).
     for (const id of FEATURE_IDS_TO_TRY) {
       for (const len of FEATURE_LENGTHS_TO_TRY) {
+        if (Date.now() >= deadline) break;
         if (await readFeature(channel, dev, id, len)) supported.push([id, len]);
       }
     }

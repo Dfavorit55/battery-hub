@@ -10,6 +10,9 @@ All notable changes to this project are documented here. Versions follow
 - HyperX Cloud Alpha Wireless showed 0% most of the time, with the odd jump to its real level. Its
   dongle answers 0 when the headset is off (and while it charges); that now shows as off instead
   of a dead battery.
+- The device scan could end with "capture timed out" on devices that are slow to refuse requests,
+  and with "enumerate timed out" on PCs where listing USB devices takes a while. The scan now
+  stops its checks on time, and listing devices gets more time.
 
 ## [2.0.3] - 2026-11-19
 
