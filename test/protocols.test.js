@@ -74,6 +74,12 @@ test('HyperX Cloud Alpha Wireless needs all three answers', () => {
   assert.equal(level.parse(frame([0x21, 0xbb, 0x0c, 66])), null);
 });
 
+test('HyperX Cloud Alpha Wireless: a level of 0 is not a reading', () => {
+  const level = entry(0x03f0, 0x098d).steps[2];
+  assert.equal(level.parse(frame([0x21, 0xbb, 0x0b, 0]), 0x098d, { charging: false }).offline, true);
+  assert.deepEqual(level.parse(frame([0x21, 0xbb, 0x0b, 0]), 0x098d, { charging: true }), {});
+});
+
 test('Logitech headsets convert voltage through the model curve', () => {
   const parse = entry(0x046d, 0x0ab5).steps[0].parse;
   const at = (mv, state) => parse(pad([0x11, 0xff, 8, 0x0a, mv >> 8, mv & 0xff, state], 20));

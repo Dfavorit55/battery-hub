@@ -19,7 +19,7 @@ function matches(logicalDevice) {
 async function runSteps(channel, entry, productId) {
   const reading = { charging: null };
   for (const step of entry.steps) {
-    const part = await exchange(channel, step.request, (frame) => step.parse(frame, productId));
+    const part = await exchange(channel, step.request, (frame) => step.parse(frame, productId, reading));
     if (part.offline) throw new Error(`${entry.kind} is off`);
     Object.assign(reading, part);
   }

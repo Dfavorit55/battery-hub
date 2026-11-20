@@ -75,9 +75,9 @@ function cloud2Step(command, parse) {
 function alphaStep(command, parse) {
   return {
     request: pad([0x21, 0xbb, command], 31),
-    parse(f) {
+    parse(f, productId, sofar) {
       if (f.length < 4 || f[0] !== 0x21 || f[1] !== 0xbb || f[2] !== command) return null;
-      return parse(f);
+      return parse(f, sofar || {});
     },
   };
 }
@@ -141,7 +141,9 @@ const DEVICES = [
     steps: [
       alphaStep(0x03, (f) => (f[3] === 0x01 ? OFFLINE : {})),
       alphaStep(0x0c, (f) => ({ charging: f[3] === 0x01 })),
-      alphaStep(0x0b, (f) => ({ capacity: clampPercent(f[3]) })),
+      // A level of 0 is not a reading: a headset that flat can't answer. HeadsetControl skips the
+      // level while charging; with the headset off the dongle answers 0 too.
+      alphaStep(0x0b, (f, sofar) => (f[3] > 0 ? { capacity: clampPercent(f[3]) } : sofar.charging ? {} : OFFLINE)),
     ],
   },
   {
