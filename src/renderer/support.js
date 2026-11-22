@@ -179,7 +179,7 @@ function deviceReportCard(request) {
   level.className = 'text-input';
   level.type = 'text';
   level.maxLength = 40;
-  level.placeholder = 'Real battery level, e.g. 62% (or "don't know")';
+  level.placeholder = 'Real battery level, e.g. 62% (or "don\'t know")';
   level.setAttribute('aria-label', 'Real battery level');
   level.addEventListener('input', () => {
     button.dataset.ready = level.value.trim() ? '1' : '';
@@ -192,7 +192,7 @@ function deviceReportCard(request) {
   const empty = scans.length && scans.every((x) => !x.captured);
   card.append(
     supportText('div', 'step-title', 'Still not working?'),
-    supportText('div', 'step-desc', 'Send a report on this device and we'll take a look. What does the device or its own app say the battery is at?'),
+    supportText('div', 'step-desc', 'Send a report on this device and we\'ll take a look. What does the device or its own app say the battery is at?'),
     ...(empty ? [supportText('div', 'check-fix', EMPTY_SCAN_TIPS)] : []),
     level,
     button,
