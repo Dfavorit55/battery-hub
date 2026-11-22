@@ -56,15 +56,20 @@ test('an old version is asked to update; an empty scan gets tips; a full one is 
   assert.deepEqual([good.labels, good.comment], [['good report'], null]);
 });
 
-test('the device list counts people and votes, most requested first', () => {
+test('the device list counts people and votes, links one main report, and keeps closed devices apart', () => {
   const body = boardBody([
-    { hardware: '3151:1020', name: 'YICHIP 2.4G Receiver', number: 26, state: 'closed', author: 'a', votes: 0 },
+    { hardware: '3151:1020', name: 'YICHIP 2.4G Receiver', number: 26, state: 'closed', author: 'a', votes: 0, duplicate: true },
     { hardware: '3151:1020', name: 'YICHIP 2.4G Receiver', number: 31, state: 'open', author: 'a', votes: 0 },
+    { hardware: '040B:0897', name: 'Fuxi-H3', number: 5, state: 'closed', author: 'd', votes: 0 },
     { hardware: '040B:0897', name: 'Fuxi-H3', number: 18, state: 'open', author: 'b', votes: 2, good: true },
-    { hardware: '040B:0897', name: 'Fuxi-H3', number: 41, state: 'closed', author: 'c', votes: 0 },
+    { hardware: '040B:0897', name: 'Fuxi-H3', number: 41, state: 'closed', author: 'c', votes: 0, duplicate: true },
+    { hardware: '04DA:23C7', name: 'Panasonic SC-GNW10', number: 59, state: 'closed', author: 'e', votes: 0 },
   ]);
-  const rows = body.split('\n').filter((l) => l.startsWith('| ') && !l.startsWith('| Requests'));
-  assert.equal(rows.length, 2);
-  assert.match(rows[0], /^\| 4 \| Fuxi-H3 \| `040B:0897` \| #18 #41 \| ✅ open \|$/);
-  assert.match(rows[1], /^\| 1 \| YICHIP/);
+  const [top, closed] = body.split('<details>');
+  const rows = (part) => part.split('\n').filter((l) => /^\| \d/.test(l));
+  assert.deepEqual(rows(top), [
+    '| 5 | Fuxi-H3 | `040B:0897` | #18 | ✅ |',
+    '| 1 | YICHIP 2.4G Receiver | `3151:1020` | #31 | |',
+  ]);
+  assert.deepEqual(rows(closed), ['| 1 | Panasonic SC-GNW10 | `04DA:23C7` | #59 | |']);
 });

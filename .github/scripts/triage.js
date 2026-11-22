@@ -80,31 +80,47 @@ function decide(report, others, latest) {
   return { labels, close: false, comment: null };
 }
 
-// The "Most requested devices" table: one row per hardware, most reports first.
+// The "Most requested devices" table: one row per hardware, most requested first. Every person who
+// asked counts once, and so does every 👍, but each device links only to its main report: closed
+// copies just send people there. Devices with no open report go in their own section below.
 function boardBody(reports) {
   const rows = new Map();
   for (const r of reports) {
     if (!r.hardware) continue;
-    const row = rows.get(r.hardware) || { hardware: r.hardware, name: r.name, issues: [], people: new Set(), votes: 0, good: false, open: false };
-    row.issues.push(r.number);
+    const row = rows.get(r.hardware) || { hardware: r.hardware, reports: [], people: new Set(), votes: 0, good: false };
+    row.reports.push(r);
     if (r.author) row.people.add(r.author);
     row.votes += r.votes || 0;
     row.good = row.good || r.good;
-    row.open = row.open || r.state === 'open';
     rows.set(r.hardware, row);
   }
+  for (const row of rows.values()) {
+    const sorted = row.reports.sort((x, y) => x.number - y.number);
+    row.main = sorted.find((r) => r.state === 'open' && !r.duplicate) || sorted.find((r) => r.state === 'open')
+      || sorted.find((r) => !r.duplicate) || sorted[0];
+    row.open = sorted.some((r) => r.state === 'open');
+  }
   const score = (r) => r.people.size + r.votes;
-  const list = [...rows.values()].sort((a, b) => score(b) - score(a) || a.hardware.localeCompare(b.hardware));
-  const lines = [
+  const byScore = (x, y) => score(y) - score(x) || x.main.number - y.main.number;
+  const line = (r) => `| ${score(r)} | ${String(r.main.name || '').replace(/\|/g, '/').slice(0, 60)} | \`${r.hardware}\` | #${r.main.number} |${r.good ? ' ✅' : ''} |`;
+  const open = [...rows.values()].filter((r) => r.open).sort(byScore);
+  const closed = [...rows.values()].filter((r) => !r.open).sort(byScore);
+  const head = ['| Requests | Device | ID | Report | |', '|---:|---|---|---|---|'];
+  return [
     'Every device people have asked Battery Hub to support, most requested first. Updated by a bot on each new report.',
     '',
-    'Have one of these? Add a 👍 to its report instead of opening a new one. ✅ means a report has scan data and the real battery level.',
+    'Have one of these? Add a 👍 to its report instead of opening a new one. Requests counts each person who asked and each 👍. ✅ means a report has scan data and the real battery level.',
     '',
-    '| Requests | Device | ID | Reports | Status |',
-    '|---:|---|---|---|---|',
-    ...list.map((r) => `| ${score(r)} | ${r.name.replace(/\|/g, '/').slice(0, 60)} | \`${r.hardware}\` | ${r.issues.sort((a, b) => a - b).map((n) => `#${n}`).join(' ')} | ${r.good ? '✅ ' : ''}${r.open ? 'open' : 'closed'} |`),
-  ];
-  return lines.join('\n');
+    ...head,
+    ...open.map(line),
+    '',
+    `<details><summary>Closed: devices that were looked at and can't be read for now (${closed.length})</summary>`,
+    '',
+    ...head,
+    ...closed.map(line),
+    '',
+    '</details>',
+  ].join('\n');
 }
 
 async function allDeviceIssues(github, owner, repo) {
@@ -126,6 +142,7 @@ async function updateBoard(github, owner, repo, issues) {
     author: i.user && i.user.login,
     votes: (i.reactions && i.reactions['+1']) || 0,
     good: (i.labels || []).some((l) => l.name === LABELS.good.name),
+    duplicate: (i.labels || []).some((l) => l.name === LABELS.duplicate.name) || i.state_reason === 'duplicate',
   }));
   const body = boardBody(reports);
   const boards = await github.paginate(github.rest.issues.listForRepo, { owner, repo, labels: BOARD_LABEL, state: 'all', per_page: 100 });
