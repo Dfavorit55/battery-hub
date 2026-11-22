@@ -64,6 +64,8 @@ test('the device list counts people and votes, links one main report, and keeps 
     { hardware: '040B:0897', name: 'Fuxi-H3', number: 18, state: 'open', author: 'b', votes: 2, good: true },
     { hardware: '040B:0897', name: 'Fuxi-H3', number: 41, state: 'closed', author: 'c', votes: 0, duplicate: true },
     { hardware: '04DA:23C7', name: 'Panasonic SC-GNW10', number: 59, state: 'closed', author: 'e', votes: 0 },
+    { hardware: '046D:0ACB', name: 'G435', number: 10, state: 'open', author: 'f', votes: 0, cantSupport: true },
+    { hardware: '046D:0ACB', name: 'G435', number: 16, state: 'open', author: 'g', votes: 0 },
   ]);
   const [top, closed] = body.split('<details>');
   const rows = (part) => part.split('\n').filter((l) => /^\| \d/.test(l));
@@ -71,5 +73,13 @@ test('the device list counts people and votes, links one main report, and keeps 
     '| 5 | Fuxi-H3 | `040B:0897` | #18 | ✅ |',
     '| 1 | YICHIP 2.4G Receiver | `3151:1020` | #31 | |',
   ]);
-  assert.deepEqual(rows(closed), ['| 1 | Panasonic SC-GNW10 | `04DA:23C7` | #59 | |']);
+  assert.deepEqual(rows(closed), ['| 2 | G435 | `046D:0ACB` | #10 | |', '| 1 | Panasonic SC-GNW10 | `04DA:23C7` | #59 | |']);
+});
+
+test("a new report of a device marked can't support is closed with that answer", () => {
+  const report = parseReport({ title: '[Device] x', body: form({ ids: 'VID_046D / PID_0ACB' }) });
+  const action = decide(report, [{ hardware: '046D:0ACB', number: 10, state: 'open', cantSupport: true }], 'v2.0.4');
+  assert.equal(action.close, true);
+  assert.deepEqual(action.labels, ['duplicate', "can't support"]);
+  assert.match(action.comment, /can't read it/);
 });

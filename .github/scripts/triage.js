@@ -12,6 +12,7 @@ const LABELS = {
   noData: { name: 'no data', color: 'cccccc', description: 'The scan caught nothing from the device' },
   old: { name: 'old version', color: 'fbca04', description: 'Sent from an older Battery Hub' },
   duplicate: { name: 'duplicate', color: 'cfd3d7', description: 'This device was already reported' },
+  cant: { name: "can't support", color: 'b60205', description: "The device doesn't share its battery level, so it can't be read" },
   board: { name: BOARD_LABEL, color: '5319e7', description: 'The list of requested devices' },
 };
 const NO_ANSWER = /^_?no response_?$|^(unknown|n\/a|none|-|don'?t know|no se|不知道)$/i;
@@ -62,6 +63,10 @@ function decide(report, others, latest) {
   // The report to send people to: an open one, else the oldest that isn't itself a closed copy.
   const same = report.hardware ? others.filter((o) => o.hardware === report.hardware).sort((a, b) => a.number - b.number) : [];
   const first = same.find((o) => o.state === 'open' && !o.duplicate) || same.find((o) => !o.duplicate) || same[0];
+  const cant = same.find((o) => o.cantSupport);
+  if (cant) {
+    return { labels: [LABELS.duplicate.name, LABELS.cant.name], close: true, comment: `Thanks! This device (${report.hardware}) was already looked at in #${cant.number}: it doesn't share its battery level, so Battery Hub can't read it. Sorry! If it also has Bluetooth, try connecting that way.` };
+  }
   if (first) {
     const answered = first.state === 'open'
       ? `Let's continue in #${first.number}: please add a 👍 there, and anything new as a comment.`
@@ -82,7 +87,8 @@ function decide(report, others, latest) {
 
 // The "Most requested devices" table: one row per hardware, most requested first. Every person who
 // asked counts once, and so does every 👍, but each device links only to its main report: closed
-// copies just send people there. Devices with no open report go in their own section below.
+// copies just send people there. Devices with no open report, or marked can't support, go in their
+// own section below.
 function boardBody(reports) {
   const rows = new Map();
   for (const r of reports) {
@@ -98,7 +104,8 @@ function boardBody(reports) {
     const sorted = row.reports.sort((x, y) => x.number - y.number);
     row.main = sorted.find((r) => r.state === 'open' && !r.duplicate) || sorted.find((r) => r.state === 'open')
       || sorted.find((r) => !r.duplicate) || sorted[0];
-    row.open = sorted.some((r) => r.state === 'open');
+    // A device marked can't support leaves the ranking even while its report stays open.
+    row.open = sorted.some((r) => r.state === 'open') && !sorted.some((r) => r.cantSupport);
   }
   const score = (r) => r.people.size + r.votes;
   const byScore = (x, y) => score(y) - score(x) || x.main.number - y.main.number;
@@ -114,7 +121,7 @@ function boardBody(reports) {
     ...head,
     ...open.map(line),
     '',
-    `<details><summary>Closed: devices that were looked at and can't be read for now (${closed.length})</summary>`,
+    `<details><summary>Can't be read: devices that were looked at and closed, or that don't share their battery level (${closed.length})</summary>`,
     '',
     ...head,
     ...closed.map(line),
@@ -143,6 +150,7 @@ async function updateBoard(github, owner, repo, issues) {
     votes: (i.reactions && i.reactions['+1']) || 0,
     good: (i.labels || []).some((l) => l.name === LABELS.good.name),
     duplicate: (i.labels || []).some((l) => l.name === LABELS.duplicate.name) || i.state_reason === 'duplicate',
+    cantSupport: (i.labels || []).some((l) => l.name === LABELS.cant.name),
   }));
   const body = boardBody(reports);
   const boards = await github.paginate(github.rest.issues.listForRepo, { owner, repo, labels: BOARD_LABEL, state: 'all', per_page: 100 });
@@ -165,6 +173,7 @@ async function run({ github, context }) {
     const others = issues.filter((i) => i.number < issue.number).map((i) => ({
       ...parseReport(i), number: i.number, state: i.state,
       duplicate: (i.labels || []).some((l) => l.name === LABELS.duplicate.name) || i.state_reason === 'duplicate',
+      cantSupport: (i.labels || []).some((l) => l.name === LABELS.cant.name),
     }));
     const action = decide(parseReport(issue), others, latest);
     const n = { owner, repo, issue_number: issue.number };
