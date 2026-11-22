@@ -69,6 +69,9 @@ module.exports = [
   [0x00db, 0x1f, "cobra hyperspeed wireless"],
   [0x00de, 0x1f, "viper v3 pro se wired"],
   [0x00df, 0x1f, "viper v3 pro se wireless"],
+  // Not in OpenRazer yet (issue #56); the transaction id follows the Viper V3 Pro.
+  [0x00e5, 0x1f, "viper v4 pro wired"],
+  [0x00e6, 0x1f, "viper v4 pro wireless"],
   [0x0258, 0x1f, "blackwidow v3 mini hyperspeed wired"],
   [0x025a, 0xff, "blackwidow v3 pro wired"],
   [0x025c, 0x9f, "blackwidow v3 pro wireless"],

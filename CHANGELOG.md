@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Versions follow
 
 ## [Unreleased]
 
+### Added
+
+- Razer Viper V4 Pro (issue #56).
+
 ### Fixed
 - HyperX Cloud Alpha Wireless showed 0% most of the time, with the odd jump to its real level. Its
   dongle answers 0 when the headset is off (and while it charges); that now shows as off instead
