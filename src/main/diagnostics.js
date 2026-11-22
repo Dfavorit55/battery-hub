@@ -12,6 +12,7 @@ const { PY_CANDIDATES } = require('./monitor');
 
 const REPO = 'battery-hub/battery-hub';
 const LATEST_RELEASE = `https://api.github.com/repos/${REPO}/releases/latest`;
+const ISSUE_SEARCH = 'https://api.github.com/search/issues';
 const NETWORK_TIMEOUT_MS = 5000;
 const LOG_DAYS = 7;
 const LOG_LINES = 8;
@@ -295,29 +296,64 @@ function scanLines({ scans = [], frames = [], lastError, failedReads }, facts) {
   return lines;
 }
 
+// An earlier report on the same hardware, so people add to it instead of opening another. Open
+// issues come first. GitHub search is the only lookup; if it can't be reached, nothing is blocked.
+async function findExistingReport(fetcher, vendor, product) {
+  const q = `repo:${REPO} is:issue in:body "VID_${vendor}" "PID_${product}"`;
+  const response = await fetcher(`${ISSUE_SEARCH}?q=${encodeURIComponent(q)}&per_page=20`, {
+    headers: { 'User-Agent': 'Battery-Hub', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(NETWORK_TIMEOUT_MS),
+  });
+  if (!response.ok) return null;
+  const items = ((await response.json()).items || []).filter((i) => !i.pull_request);
+  const best = items.find((i) => i.state === 'open') || items[0];
+  return best ? { number: best.number, url: best.html_url, state: best.state } : null;
+}
+
+// Why a new report wouldn't help yet, checked before GitHub opens:
+//   outdated: an old version, where the problem may already be fixed
+//   sent:     this PC opened a report on this device before
+//   known:    someone already reported this hardware
+async function reportGate(deps, checks, vendor, product, notSent) {
+  const version = checks.find((c) => c.id === 'version');
+  if (version && version.status === 'fail') return { kind: 'outdated', detail: version.detail };
+  if (!product) return null;
+  const key = `${vendor}:${product}`;
+  const existing = await findExistingReport(deps.fetcher, vendor, product).catch(() => null);
+  if (existing) return { kind: 'known', ...existing };
+  const sentAt = (deps.reported || {})[key];
+  if (sentAt && !notSent) return { kind: 'sent', sentAt, url: `https://github.com/${REPO}/issues?q=${encodeURIComponent(`"VID_${vendor}" "PID_${product}"`)}` };
+  return null;
+}
+
 // The report behind Send device report: what happened with the device, plus the full check so a
 // fault on the sender's end shows up. Fills in the device request form.
 async function deviceReport(deps, request, live) {
   const health = await runChecks(deps);
   const facts = deviceFacts(request, live);
   const scan = sanitize(scanLines(request, facts).join('\n'));
-  const [vendor, product] = facts.hardware.split(':');
+  const [vendor, product] = facts.hardware.toUpperCase().split(':');
+  const actual = String(request.actual || '').trim().slice(0, 40);
   const report = sanitize([
     `Device: ${facts.product}`,
     `Maker: ${facts.manufacturer || 'Unknown'}`,
     `Hardware: ${facts.hardware}`,
     `Connection: ${facts.connection}`,
     `Driver: ${facts.driver}`,
+    ...(actual ? [`Real battery level: ${actual}`] : []),
     scan, '', health.report,
   ].join('\n'));
+  const gate = await reportGate(deps, health.checks, vendor, product, !!request.notSent);
   return {
     ...health,
     report,
+    gate,
+    hardware: product ? `${vendor}:${product}` : null,
     ...issueLink('device-support.yml', {
       title: `[Device] ${facts.product}`,
       device: [facts.manufacturer, facts.product].filter(Boolean).join(' '),
       connection: facts.connection,
-      ids: product ? `VID_${vendor} / PID_${product}`.toUpperCase() : facts.hardware,
+      ids: product ? `VID_${vendor} / PID_${product}` : facts.hardware,
+      ...(actual ? { actual } : {}),
       version: deps.version,
       notes: health.report.split('\n').filter((line) => BRIEF_LINES.test(line)).join('\n'),
       scan,

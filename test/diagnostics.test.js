@@ -373,3 +373,56 @@ test('a collection Windows gives no usage for shows as ---- in a report, not NaN
   assert.match(scan, /Channels: f100:----, 000c:0001/);
   assert.doesNotMatch(scan, /NaN/);
 });
+
+// A fetcher that answers the release check and the issue search separately.
+function gateFetcher(latest, items) {
+  return async (url) => ({
+    ok: true,
+    json: async () => (url.includes('/search/issues') ? { items } : { tag_name: `v${latest}` }),
+  });
+}
+
+async function gateFor(deps, request = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bh-gate-'));
+  await writeManifest(root, '1.3.1');
+  const result = await deviceReport({ ...healthyDeps(root), ...deps, root, userData: root }, { id: '13652:62858:serial', product: 'VXE Mouse', scans: [], ...request }, null);
+  fs.rmSync(root, { recursive: true });
+  return result;
+}
+
+test('an old version is asked to update before reporting', async () => {
+  const { gate } = await gateFor({ fetcher: gateFetcher('1.4.0', []) });
+  assert.equal(gate.kind, 'outdated');
+});
+
+test('hardware someone already reported points to that report, open ones first', async () => {
+  const items = [
+    { number: 5, html_url: 'https://github.com/x/5', state: 'closed' },
+    { number: 9, html_url: 'https://github.com/x/9', state: 'open' },
+  ];
+  const { gate, hardware } = await gateFor({ fetcher: gateFetcher('1.3.1', items) });
+  assert.deepEqual(gate, { kind: 'known', number: 9, url: 'https://github.com/x/9', state: 'open' });
+  assert.equal(hardware, '3554:F58A');
+});
+
+test('a device this PC already reported is not sent again unless the person says it was not sent', async () => {
+  const deps = { fetcher: gateFetcher('1.3.1', []), reported: { '3554:F58A': 1700000000000 } };
+  assert.equal((await gateFor(deps)).gate.kind, 'sent');
+  assert.equal((await gateFor(deps, { notSent: true })).gate, null);
+});
+
+test('a new device with nothing blocking it goes through, with the real level filled in', async () => {
+  const result = await gateFor({ fetcher: gateFetcher('1.3.1', []) }, { actual: ' 62% ' });
+  assert.equal(result.gate, null);
+  const form = new URL(result.url).searchParams;
+  assert.equal(form.get('actual'), '62%');
+  assert.match(result.report, /^Real battery level: 62%$/m);
+});
+
+test('if GitHub search cannot be reached, nothing is blocked', async () => {
+  const fetcher = async (url) => {
+    if (url.includes('/search/issues')) throw new Error('offline');
+    return { ok: true, json: async () => ({ tag_name: 'v1.3.1' }) };
+  };
+  assert.equal((await gateFor({ fetcher })).gate, null);
+});

@@ -412,6 +412,13 @@ const supportDeps = () => ({
   enumerate: hidClient.enumerate,
   windowsSelfTest: system.selfTest,
   devices: store.getDevices(),
+  reported: store.getSetting('reportedDevices') || {},
+});
+
+// Remembers that this PC opened a report on a piece of hardware, so it isn't sent again.
+ipcMain.handle('support:mark-reported', (evt, hardware) => {
+  if (typeof hardware !== 'string' || !/^[0-9A-F]{4}:[0-9A-F]{4}$/.test(hardware)) return;
+  store.setSettings({ reportedDevices: { ...(store.getSetting('reportedDevices') || {}), [hardware]: Date.now() } });
 });
 
 ipcMain.handle('support:run', () => diagnostics.runChecks(supportDeps()));

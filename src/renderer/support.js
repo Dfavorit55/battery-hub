@@ -90,27 +90,82 @@ function renderResults(result, target = supportResults, sendLabel = 'Send suppor
   target.hidden = false;
 }
 
+// Shown instead of sending when a new report wouldn't help. Each says what to do instead.
+function renderGate(gate, result, request, button, target) {
+  const parts = [];
+  if (gate.kind === 'outdated') {
+    const update = document.createElement('button');
+    update.className = 'btn btn-primary';
+    update.textContent = 'Check for updates';
+    update.addEventListener('click', () => window.batteryHub.checkForUpdates());
+    parts.push(
+      supportText('div', 'step-title', 'Update first'),
+      supportText('div', 'check-detail', `${gate.detail} This problem may already be fixed. Update, then scan again.`),
+      checkActions(update),
+    );
+  } else if (gate.kind === 'known') {
+    const open = document.createElement('button');
+    open.className = 'btn btn-primary';
+    open.textContent = `Open report #${gate.number}`;
+    const note = supportText('div', 'check-note', 'Your report is copied. Paste it there as a comment, and add a 👍 to the issue: that helps more than a new report.');
+    open.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(result.report).catch(() => {});
+      await window.batteryHub.openExternal(gate.url).catch(() => {});
+      if (result.hardware) window.batteryHub.markReported(result.hardware);
+    });
+    parts.push(
+      supportText('div', 'step-title', 'This device was already reported'),
+      supportText('div', 'check-detail', gate.state === 'open'
+        ? `Someone with the same device opened report #${gate.number}. Add yours to it instead of starting a new one.`
+        : `This device was looked at in report #${gate.number}, which has the answer. Add yours there if something changed.`),
+      checkActions(open, copyButton(result.report)),
+      note,
+    );
+  } else if (gate.kind === 'sent') {
+    const find = document.createElement('button');
+    find.className = 'btn btn-primary';
+    find.textContent = 'Find my report';
+    find.addEventListener('click', () => window.batteryHub.openExternal(gate.url).catch(() => {}));
+    const notSent = document.createElement('button');
+    notSent.className = 'btn btn-ghost';
+    notSent.textContent = "I didn't send it";
+    notSent.addEventListener('click', () => sendDeviceReport(button, { ...request, notSent: true }, target));
+    parts.push(
+      supportText('div', 'step-title', 'You already reported this device'),
+      supportText('div', 'check-detail', `Battery Hub opened a report on it ${new Date(gate.sentAt).toLocaleDateString()}. Add anything new as a comment there.`),
+      checkActions(find, notSent),
+    );
+  }
+  target.replaceChildren(...parts);
+}
+
 async function sendDeviceReport(button, request, target) {
   button.disabled = true;
   button.textContent = 'Checking…';
   try {
     const result = await window.batteryHub.deviceReport(request);
-    if (result.verdict.tone === 'bad') {
+    if (result.gate) {
+      renderGate(result.gate, result, request, button, target);
+    } else if (result.verdict.tone === 'bad') {
       // The fault looks to be on their end, so show them the fix before anything else.
       renderResults(result, target, 'Send anyway');
     } else {
       const note = supportText('div', 'check-note', result.complete ? SENT_NOTE : SENT_NOTE + LONG_NOTE);
       target.replaceChildren(note, checkActions(copyButton(result.report)));
       await openReport(result, note);
+      if (result.hardware) window.batteryHub.markReported(result.hardware);
     }
   } catch (e) {
     target.replaceChildren(supportText('div', 'check-detail', `The report couldn't be made: ${plainError(e)}`));
   } finally {
-    button.disabled = false;
     button.textContent = 'Send device report';
+    button.disabled = !button.dataset.ready;
     target.scrollIntoView({ block: 'nearest' });
   }
 }
+
+// A scan that caught nothing usually means the device was asleep, so say how to get a better one.
+const EMPTY_SCAN_TIPS = 'Before sending: make sure the device is on and awake, and turn it off and on while the scan runs. If it also has Bluetooth, try that: Battery Hub reads Bluetooth batteries.';
 
 function deviceReportCard(request) {
   const card = document.createElement('div');
@@ -118,12 +173,28 @@ function deviceReportCard(request) {
   const button = document.createElement('button');
   button.className = 'btn btn-primary';
   button.textContent = 'Send device report';
+  button.disabled = true;
+  // The real level is what turns captured bytes into a battery reading, so it's asked for first.
+  const level = document.createElement('input');
+  level.className = 'text-input';
+  level.type = 'text';
+  level.maxLength = 40;
+  level.placeholder = 'Real battery level, e.g. 62% (or "don't know")';
+  level.setAttribute('aria-label', 'Real battery level');
+  level.addEventListener('input', () => {
+    button.dataset.ready = level.value.trim() ? '1' : '';
+    button.disabled = !button.dataset.ready;
+  });
   const result = document.createElement('div');
   result.className = 'device-report-result';
-  button.addEventListener('click', () => sendDeviceReport(button, request, result));
+  button.addEventListener('click', () => sendDeviceReport(button, { ...request, actual: level.value }, result));
+  const scans = request.scans || [];
+  const empty = scans.length && scans.every((x) => !x.captured);
   card.append(
     supportText('div', 'step-title', 'Still not working?'),
-    supportText('div', 'step-desc', 'Send a report on this device and we\'ll take a look.'),
+    supportText('div', 'step-desc', 'Send a report on this device and we'll take a look. What does the device or its own app say the battery is at?'),
+    ...(empty ? [supportText('div', 'check-fix', EMPTY_SCAN_TIPS)] : []),
+    level,
     button,
     result,
   );

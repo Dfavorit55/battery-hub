@@ -10,6 +10,10 @@ body:
         to work out a device's battery protocol — without them a request usually can't
         go anywhere.
 
+        **Before you start:** check the pinned **Most requested devices** issue. If your device
+        is already there, add a 👍 to its report instead of opening a new one. Please use the
+        latest Battery Hub, and send each device only once.
+
   - type: input
     id: device
     attributes:
@@ -56,7 +60,9 @@ body:
     attributes:
       label: Actual battery level during the scan
       description: The real percentage at the time, if the device or its own software reports one.
-      placeholder: e.g. 62%
+      placeholder: e.g. 62%, or "don't know"
+    validations:
+      required: true
 
   - type: textarea
     id: notes

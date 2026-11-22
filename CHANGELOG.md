@@ -9,6 +9,10 @@ All notable changes to this project are documented here. Versions follow
 ### Added
 
 - Razer Viper V4 Pro (issue #56).
+- Send device report now checks first: it asks you to update if you are on an old version, sends
+  you to the existing report if someone already reported the same device, and does not send the
+  same device twice from one PC. It also asks for the real battery level, and gives tips when the
+  scan caught nothing.
 
 ### Fixed
 - HyperX Cloud Alpha Wireless showed 0% most of the time, with the odd jump to its real level. Its

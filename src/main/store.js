@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   closeToTray: true,        // hide to tray instead of quitting on close
   launchAtLogin: false,
   startMinimized: false,
+  reportedDevices: {},      // 'VVVV:PPPP' -> when this PC last opened a device report on it
 };
 
 const store = new Store({

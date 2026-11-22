@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('batteryHub', {
   openExternal: (url) => ipcRenderer.invoke('app:open-external', url),
   runSupportCheck: () => ipcRenderer.invoke('support:run'),
   deviceReport: (request) => ipcRenderer.invoke('support:device-report', request),
+  markReported: (hardware) => ipcRenderer.invoke('support:mark-reported', hardware),
 
   localTools: () => ipcRenderer.invoke('local-tools:list'),
   runLocalTool: (id) => ipcRenderer.send('local-tools:run', id),
