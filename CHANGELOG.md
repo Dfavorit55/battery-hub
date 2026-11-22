@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Versions follow
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-11-22
+
 ### Added
 
 - Razer Viper V4 Pro (issue #56).
@@ -295,7 +297,8 @@ First stable release, consolidating the 1.0.x and 1.1.x series.
 Initial public release: live battery monitoring for wireless HID devices, per-device tray
 icons, low-battery notifications, history sparklines and the guided calibration wizard.
 
-[Unreleased]: https://github.com/battery-hub/battery-hub/compare/v2.0.3...HEAD
+[Unreleased]: https://github.com/battery-hub/battery-hub/compare/v2.0.4...HEAD
+[2.0.4]: https://github.com/battery-hub/battery-hub/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/battery-hub/battery-hub/compare/v2.0.2...v2.0.3
 [1.3.1]: https://github.com/battery-hub/battery-hub/releases/tag/v1.3.1
 [1.3.0]: https://github.com/battery-hub/battery-hub/releases/tag/v1.3.0
