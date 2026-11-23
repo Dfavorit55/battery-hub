@@ -109,6 +109,18 @@ function ruPlural(n, one, few, many) {
   return many;
 }
 const RU_PATTERNS = [
+  [/^Scan failed: (.+)$/, (m) => `Ошибка сканирования: ${m[1]}`],
+  [/^Channel 0x([0-9a-fA-F]+), (input|output|feature) report (\d+), seen (\d+) times$/, (m) => {
+    const kind = { input: 'входящий', output: 'исходящий', feature: 'служебный' }[m[2]];
+    return `Канал 0x${m[1]}, ${kind} отчёт ${m[3]}, получен ${m[4]} ${ruPlural(m[4], 'раз', 'раза', 'раз')}`;
+  }],
+  [/^Open report #(\d+)$/, (m) => `Открыть отчёт №${m[1]}`],
+  [/^(.+) This problem may already be fixed\. Update, then scan again\.$/, (m) => `${m[1]} Возможно, проблему уже исправили. Обновите программу и повторите сканирование.`],
+  [/^Someone with the same device opened report #(\d+)\. Add yours to it instead of starting a new one\.$/, (m) => `Для такого устройства уже есть обращение №${m[1]}. Добавьте информацию туда, а не создавайте новое.`],
+  [/^This device was looked at in report #(\d+), which has the answer\. Add yours there if something changed\.$/, (m) => `Устройство уже рассматривали в обращении №${m[1]}. Если появились новые сведения, добавьте их туда.`],
+  [/^Battery Hub opened a report on it (.+)\. Add anything new as a comment there\.$/, (m) => `Battery Hub создал обращение ${m[1]}. Новые сведения можно добавить в комментарий.`],
+  [/^The report couldn't be made: (.+)$/, (m) => `Не удалось подготовить отчёт: ${m[1]}`],
+  [/^The check couldn't finish: (.+)$/, (m) => `Не удалось завершить проверку: ${m[1]}`],
   [/^Updated (\d+[dhms]) ago$/, (m) => `Обновлено ${duration(m[1], 'ru')} назад`],
   [/^(\d+[dhms]) ago$/, (m) => `${duration(m[1], 'ru')} назад`],
   [/^~((?:\d+[dhm] ?)+) left$/, (m) => `Осталось примерно ${duration(m[1], 'ru')}`],
@@ -136,16 +148,19 @@ function bhTranslate(text, lang) {
   if (!trimmed) return s;
   const table = (typeof BH_STRINGS !== 'undefined' ? BH_STRINGS : require('./i18n-strings').BH_STRINGS)[lang];
   if (!table) return s;
+  // Collapse internal whitespace for strings split across multiple source lines.
+  const normalized = trimmed.replace(/\s+/g, ' ');
   let out = table[trimmed];
+  if (out === undefined && normalized !== trimmed) out = table[normalized];
   if (out === undefined) {
     for (const [re, forms] of PATTERNS) {
-      const m = trimmed.match(re);
+      const m = normalized.match(re);
       if (m && forms[lang]) { out = forms[lang](m, lang); break; }
     }
   }
   if (out === undefined && lang === 'ru') {
     for (const [re, format] of RU_PATTERNS) {
-      const m = trimmed.match(re);
+      const m = normalized.match(re);
       if (m) { out = format(m); break; }
     }
   }
