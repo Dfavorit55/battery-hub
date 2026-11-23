@@ -3,13 +3,14 @@
 // unknown comes back unchanged, so a missing translation shows English rather than nothing.
 // Pure: loaded as a plain script by the windows (after i18n-strings.js) and required by the main
 // process for the tray and notifications.
-const BH_LANGS = ['en', 'es', 'zh', 'he'];
+const BH_LANGS = ['en', 'es', 'zh', 'he', 'ru'];
 
 // 'system' or a missing setting follows the Windows display language.
 function resolveLanguage(setting, locale) {
   if (BH_LANGS.includes(setting)) return setting;
   const l = String(locale || '').toLowerCase();
   if (l.startsWith('es')) return 'es';
+  if (l.startsWith('ru')) return 'ru';
   if (l.startsWith('zh')) return 'zh';
   if (l.startsWith('he') || l.startsWith('iw')) return 'he';
   return 'en';
@@ -20,6 +21,7 @@ const UNITS = {
   es: { d: ' d', h: ' h', m: ' min', s: ' s' },
   zh: { d: '天', h: '小时', m: '分钟', s: '秒' },
   he: { d: ' ימ׳', h: ' שע׳', m: ' דק׳', s: ' שנ׳' },
+  ru: { d: ' дн.', h: ' ч', m: ' мин', s: ' сек.' },
 };
 function duration(text, lang) {
   return text.replace(/(\d+)([dhms])\b/g, (all, n, unit) => n + UNITS[lang][unit]);
@@ -96,6 +98,37 @@ const PATTERNS = [
   }],
 ];
 
+// Russian dynamic translations with correct plural forms for counts.
+function ruPlural(n, one, few, many) {
+  const v = Math.abs(Number(n));
+  const mod100 = v % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  const mod10 = v % 10;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+const RU_PATTERNS = [
+  [/^Updated (\d+[dhms]) ago$/, (m) => `Обновлено ${duration(m[1], 'ru')} назад`],
+  [/^(\d+[dhms]) ago$/, (m) => `${duration(m[1], 'ru')} назад`],
+  [/^~((?:\d+[dhm] ?)+) left$/, (m) => `Осталось примерно ${duration(m[1], 'ru')}`],
+  [/^~((?:\d+[dhm] ?)+)$/, (m) => `≈${duration(m[1], 'ru')}`],
+  [/^([\d.]+)% a day$/, (m) => `${m[1]}% в день`],
+  [/^([\d.]+)% an hour$/, (m) => `${m[1]}% в час`],
+  [/^Same as Settings \((\d+)%\)$/, (m) => `Как в настройках (${m[1]}%)`],
+  [/^Charging, (\d+)%$/, (m) => `Заряжается, ${m[1]}%`],
+  [/^(\d+) hidden devices?$/, (m) => `${m[1]} ${ruPlural(m[1], 'скрытое устройство', 'скрытых устройства', 'скрытых устройств')}`],
+  [/^(.*) · (\d+) channels?$/, (m) => `${m[1]} · ${m[2]} ${ruPlural(m[2], 'канал', 'канала', 'каналов')}`],
+  [/^Version (\S+)$/, (m) => `Версия ${m[1]}`],
+  [/^Update available: (v\S+)$/, (m) => `Доступно обновление: ${m[1]}`],
+  [/^Update ready: (v\S+)$/, (m) => `Обновление готово: ${m[1]}`],
+  [/^Set up (.+)$/, (m) => `Настроить ${m[1]}`],
+  [/^(.+): open details$/, (m) => `${m[1]}: открыть сведения`],
+  [/^(.+) is at (\d+)%\. Time to charge\.$/, (m) => `Устройство «${m[1]}»: заряд ${m[2]}%. Пора заряжать.`],
+  [/^(.+) is charging \((\d+)%\)\.$/, (m) => `Устройство «${m[1]}» заряжается (${m[2]}%).`],
+  [/^(.+) is charged \((\d+)%\)\.$/, (m) => `Устройство «${m[1]}» заряжено (${m[2]}%).`],
+];
+
 function bhTranslate(text, lang) {
   if (lang === 'en' || text == null) return text;
   const s = String(text);
@@ -108,6 +141,12 @@ function bhTranslate(text, lang) {
     for (const [re, forms] of PATTERNS) {
       const m = trimmed.match(re);
       if (m && forms[lang]) { out = forms[lang](m, lang); break; }
+    }
+  }
+  if (out === undefined && lang === 'ru') {
+    for (const [re, format] of RU_PATTERNS) {
+      const m = trimmed.match(re);
+      if (m) { out = format(m); break; }
     }
   }
   if (out === undefined) return s;
