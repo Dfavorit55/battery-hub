@@ -38,5 +38,25 @@ test('every language has the same keys', () => {
   const keys = (l) => Object.keys(BH_STRINGS[l]).sort().join('|');
   assert.equal(keys('es'), keys('zh'));
   assert.equal(keys('es'), keys('he'));
-  assert.equal(keys('es'), keys('ru'));
+  // Russian includes extra strings used by the device calibration wizard.
+  for (const key of Object.keys(BH_STRINGS.es)) assert.ok(Object.hasOwn(BH_STRINGS.ru, key), `Missing Russian key: ${key}`);
+});
+
+test('Russian calibration, support and compact labels', () => {
+  assert.equal(bhTranslate('1. Scan the device', 'ru'), '1. Сканирование устройства');
+  assert.equal(bhTranslate('Scan again', 'ru'), 'Повторить сканирование');
+  assert.equal(bhTranslate('Still not working?', 'ru'), 'Всё ещё не работает?');
+  assert.equal(bhTranslate('Real battery level, e.g. 62% (or "don\'t know")', 'ru'),
+    'Фактический заряд, например 62% (или «не знаю»)');
+  assert.equal(bhTranslate('Scan failed: timeout', 'ru'), 'Ошибка сканирования: timeout');
+  assert.equal(bhTranslate('Channel 0xff00, input report 85, seen 3 times', 'ru'),
+    'Канал 0xff00, входящий отчёт 85, получен 3 раза');
+  assert.equal(bhTranslate('System', 'ru'), 'Система');
+  assert.equal(bhTranslate('Most urgent', 'ru'), 'По заряду');
+  assert.equal(bhTranslate('My order', 'ru'), 'Вручную');
+  assert.equal(bhTranslate('Per device', 'ru'), 'Отдельно');
+  assert.equal(bhTranslate('Single list', 'ru'), 'Списком');
+  assert.equal(bhTranslate('Add', 'ru'), 'Добавить');
+  assert.equal(bhTranslate('  The scan takes 30 seconds. While it runs, turn the device off and on once or twice, because\n    many devices only report their battery at power on. If the device has its own app, keep it open.  ', 'ru'),
+    '  Сканирование длится 30 секунд. За это время выключите и снова включите устройство один или два раза: некоторые устройства передают заряд только при включении. Если у устройства есть своя программа, не закрывайте её.  ');
 });
